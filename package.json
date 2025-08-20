@@ -1,0 +1,38 @@
+{
+  "name": "domain-dash",
+  "version": "1.0.0",
+  "description": "CLI domain availability dashboard with real-time monitoring",
+  "main": "index.js",
+  "bin": {
+    "domain-dash": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "daemon": "node daemon.js",
+    "install-global": "npm install -g ."
+  },
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.11.0",
+    "node-notifier": "^10.0.1",
+    "whois": "^2.13.5",
+    "dns": "^0.2.2",
+    "commander": "^11.1.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "conf": "^10.2.0",
+    "csv-writer": "^1.6.0",
+    "axios": "^1.6.0",
+    "cron": "^3.1.6"
+  },
+  "keywords": [
+    "domain",
+    "availability",
+    "cli",
+    "dashboard",
+    "monitoring",
+    "whois"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
