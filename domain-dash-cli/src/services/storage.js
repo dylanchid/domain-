@@ -4,24 +4,33 @@ const fs = require('fs');
 
 class Storage {
   constructor() {
+    // Keep defaults locally for reliable reset()
+    this.defaults = {
+      domains: [],
+      settings: {
+        checkInterval: 5, // minutes
+        notifications: true,
+        autoRefresh: true,
+        extensions: ['.com', '.org', '.net', '.co', '.io', '.dev', '.app', '.ai']
+      },
+      history: []
+    };
+
+    // Use isolated config in test environment to avoid cross-test interference
+    const isTestEnv = process.env.NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
+    const projectName = isTestEnv
+      ? `domain--test-${process.env.JEST_WORKER_ID || '1'}`
+      : 'domain-';
+
     this.config = new Conf({
-      projectName: 'domain-dash',
-      defaults: {
-        domains: [],
-        settings: {
-          checkInterval: 5, // minutes
-          notifications: true,
-          autoRefresh: true,
-          extensions: ['.com', '.org', '.net', '.co', '.io', '.dev', '.app', '.ai']
-        },
-        history: []
-      }
+      projectName,
+      defaults: this.defaults
     });
 
     this.configPath = this.config.path;
   }
 
-  // Domain management
+  // Domains
   getDomains() {
     return this.config.get('domains', []);
   }
@@ -31,19 +40,27 @@ class Storage {
     this.addToHistory('domains_updated', { count: domains.length });
   }
 
+  normalizeName(name) {
+    return String(name || '').trim().toLowerCase();
+  }
+
   addDomain(domain) {
     const domains = this.getDomains();
-    const existing = domains.find(d => d.name === domain.name);
+    const name = this.normalizeName(domain.name);
+    const existing = domains.find(d => this.normalizeName(d.name) === name);
     
     if (!existing) {
       domains.push({
-        name: domain.name,
+        name,
         extensions: domain.extensions || ['.com'],
+        // Per-extension status map
+        results: {}, // { '.com': { available, lastChecked, error, via } }
         status: 'pending',
         available: null,
         lastChecked: null,
         addedAt: new Date().toISOString(),
-        ...domain
+        ...domain,
+        name // ensure normalized name persists
       });
       
       this.saveDomains(domains);
@@ -55,7 +72,7 @@ class Storage {
 
   removeDomain(domainName) {
     const domains = this.getDomains();
-    const filtered = domains.filter(d => d.name !== domainName);
+    const filtered = domains.filter(d => this.normalizeName(d.name) !== this.normalizeName(domainName));
     
     if (filtered.length < domains.length) {
       this.saveDomains(filtered);
@@ -65,9 +82,11 @@ class Storage {
     return false; // Not found
   }
 
+  // Backward-compatible aggregate update
   updateDomainStatus(domainName, status) {
     const domains = this.getDomains();
-    const domain = domains.find(d => d.name === domainName);
+    const name = this.normalizeName(domainName);
+    const domain = domains.find(d => this.normalizeName(d.name) === name);
     
     if (domain) {
       const wasAvailable = domain.available;
@@ -76,10 +95,9 @@ class Storage {
       domain.lastChecked = new Date().toISOString();
       domain.error = status.error || null;
       
-      // Track status changes
       if (wasAvailable !== null && wasAvailable !== status.available) {
         this.addToHistory('status_change', {
-          domain: domainName,
+          domain: name,
           from: wasAvailable ? 'available' : 'taken',
           to: status.available ? 'available' : 'taken'
         });
@@ -92,7 +110,51 @@ class Storage {
     return false;
   }
 
-  // Settings management
+  // Per-extension update and aggregate sync
+  updateDomainExtensionStatus(domainName, extension, status) {
+    const domains = this.getDomains();
+    const name = this.normalizeName(domainName);
+    const domain = domains.find(d => this.normalizeName(d.name) === name);
+    if (!domain) return false;
+
+    if (!domain.results) domain.results = {};
+    const prev = domain.results[extension] || { available: null };
+
+    domain.results[extension] = {
+      available: status.available,
+      lastChecked: new Date().toISOString(),
+      error: status.error || null,
+      via: status.via || null
+    };
+
+    // Aggregate status for legacy consumers
+    domain.lastChecked = new Date().toISOString();
+    const statuses = (domain.extensions || []).map(ext => domain.results?.[ext]?.available);
+    if (statuses.some(v => v === true)) {
+      domain.available = true;
+      domain.status = 'available';
+    } else if (statuses.some(v => v === null || v === undefined)) {
+      domain.available = null;
+      domain.status = 'pending';
+    } else if (statuses.length) {
+      domain.available = false;
+      domain.status = 'taken';
+    }
+
+    if (prev.available !== null && prev.available !== status.available) {
+      this.addToHistory('status_change', {
+        domain: name,
+        extension,
+        from: prev.available ? 'available' : 'taken',
+        to: status.available ? 'available' : 'taken'
+      });
+    }
+
+    this.saveDomains(domains);
+    return true;
+  }
+
+  // Settings
   getSettings() {
     return this.config.get('settings');
   }
@@ -114,7 +176,7 @@ class Storage {
     this.addToHistory('setting_changed', { key, value });
   }
 
-  // History tracking
+  // History
   addToHistory(action, data = {}) {
     const history = this.config.get('history', []);
     const entry = {
@@ -123,9 +185,8 @@ class Storage {
       data
     };
     
-    history.unshift(entry); // Add to beginning
+    history.unshift(entry);
     
-    // Keep only last 1000 entries
     if (history.length > 1000) {
       history.splice(1000);
     }
@@ -142,7 +203,7 @@ class Storage {
     this.config.set('history', []);
   }
 
-  // Data export/import
+  // Import/Export
   exportData() {
     return {
       domains: this.getDomains(),
@@ -162,11 +223,17 @@ class Storage {
     
     try {
       if (data.domains && Array.isArray(data.domains)) {
-        this.saveDomains(data.domains);
+        // migrate to ensure results exists
+        const migrated = data.domains.map(d => ({ results: {}, ...d }));
+        this.saveDomains(migrated);
       }
       
       if (data.settings && typeof data.settings === 'object') {
         this.config.set('settings', { ...this.getSettings(), ...data.settings });
+      }
+
+      if (Array.isArray(data.history)) {
+        this.config.set('history', data.history);
       }
       
       this.addToHistory('data_imported', { 
@@ -176,17 +243,16 @@ class Storage {
       
       return true;
     } catch (error) {
-      // Restore backup on error
       this.config.set('domains', backup.domains);
       this.config.set('settings', backup.settings);
+      this.config.set('history', backup.history || []);
       throw error;
     }
   }
 
-  // Statistics
+  // Stats
   getStats() {
     const domains = this.getDomains();
-    const now = new Date();
     
     const stats = {
       totalDomains: domains.length,
@@ -202,20 +268,14 @@ class Storage {
       extensionBreakdown: {}
     };
 
-    // Count by extensions
+    // Count configured extensions per domain
     domains.forEach(domain => {
-      const ext = this.extractExtension(domain.name);
-      if (ext) {
+      (domain.extensions || []).forEach(ext => {
         stats.extensionBreakdown[ext] = (stats.extensionBreakdown[ext] || 0) + 1;
-      }
+      });
     });
 
     return stats;
-  }
-
-  extractExtension(domainName) {
-    const extensions = this.getSetting('extensions');
-    return extensions.find(ext => domainName.endsWith(ext)) || null;
   }
 
   // File operations
@@ -235,21 +295,22 @@ class Storage {
     return this.importData(data);
   }
 
-  // Cleanup utilities
+  // Cleanup
   clearAll() {
     this.config.clear();
   }
 
   reset() {
-    const defaultSettings = this.config.defaults;
     this.config.clear();
-    this.config.set('settings', defaultSettings.settings);
+    this.config.set('settings', this.defaults.settings);
+    this.config.set('domains', this.defaults.domains);
+    this.config.set('history', this.defaults.history);
   }
 
-  // Backup management
+  // Backups
   createBackup() {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupPath = path.join(path.dirname(this.configPath), `domain-dash-backup-${timestamp}.json`);
+    const backupPath = path.join(path.dirname(this.configPath), `domain--backup-${timestamp}.json`);
     return this.exportToFile(backupPath);
   }
 
@@ -258,7 +319,7 @@ class Storage {
     if (!fs.existsSync(configDir)) return [];
     
     return fs.readdirSync(configDir)
-      .filter(file => file.startsWith('domain-dash-backup-') && file.endsWith('.json'))
+      .filter(file => file.startsWith('domain--backup-') && file.endsWith('.json'))
       .map(file => ({
         filename: file,
         path: path.join(configDir, file),
@@ -299,4 +360,3 @@ class Storage {
 }
 
 module.exports = Storage;
-
