@@ -1,12 +1,12 @@
 const { Command } = require('commander');
-const addCommand = require('./commands/add');
-const removeCommand = require('./commands/remove');
-const listCommand = require('./commands/list');
-const checkCommand = require('./commands/check');
-const watchCommand = require('./commands/watch');
-const importCommand = require('./commands/import');
-const exportCommand = require('./commands/export');
-const settingsCommand = require('./commands/settings');
+const { addDomain } = require('./commands/add');
+const { removeDomain } = require('./commands/remove');
+const { listDomains } = require('./commands/list');
+const { checkDomains } = require('./commands/check');
+const { watchDomains } = require('./commands/watch');
+const { importDomains } = require('./commands/import');
+const { exportDomains } = require('./commands/export');
+const { manageSettings } = require('./commands/settings');
 const { start: serviceStart, stop: serviceStop, status: serviceStatus, logs: serviceLogs } = require('./commands/service');
 const startTui = require('../tui');
 
@@ -24,26 +24,26 @@ program
   .action((domain, options) => {
     if (options.extensions) {
       const exts = options.extensions.split(',').map(e => e.trim());
-      return addCommand({ name: domain, extensions: exts });
+      return addDomain({ name: domain, extensions: exts });
     }
-    return addCommand(domain);
+    return addDomain(domain);
   });
 
 program
   .command('remove <domain>')
   .description('Remove a domain from the monitoring list')
-  .action(removeCommand);
+  .action(removeDomain);
 
 program
   .command('list')
   .description('List all monitored domains and their statuses')
-  .action(listCommand);
+  .action(listDomains);
 
 program
   .command('check')
   .description('Check availability for all monitored domains')
   .option('-c, --concurrency <n>', 'Max concurrent checks', v => Number(v), 4)
-  .action(checkCommand);
+  .action(checkDomains);
 
 program
   .command('watch')
@@ -52,24 +52,24 @@ program
   .option('--no-notifications', 'Disable system notifications')
   .option('-c, --concurrency <n>', 'Max concurrent checks', v => Number(v), 4)
   .option('-d, --daemon [manager]', 'Run as a background service via pm2 or launchd ("pm2" | "launchd")')
-  .action(watchCommand);
+  .action(watchDomains);
 
 program
   .command('import <file>')
   .description('Import domains from a JSON or CSV file')
-  .action(importCommand);
+  .action(importDomains);
 
 program
   .command('export')
   .description('Export monitored domains to a JSON or CSV file')
   .option('-f, --format <format>', 'json or csv', 'json')
   .option('-o, --out <file>', 'output file path')
-  .action(exportCommand);
+  .action(exportDomains);
 
 program
   .command('settings')
   .description('Manage application settings')
-  .action(settingsCommand);
+  .action(manageSettings);
 
 // Service management (pm2 / launchd)
 const service = program

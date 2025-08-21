@@ -34,4 +34,4 @@ function exportCommand(program) {
     });
 }
 
-module.exports = { exportCommand, exportDomains };
+module.exports = { exportDomains };

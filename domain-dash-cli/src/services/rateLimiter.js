@@ -58,17 +58,17 @@ class RateLimiter {
   }
 
   // Get current status of rate limiters
-  getStatus() {
+  async getStatus() {
     const status = {};
-    Object.keys(this.limiters).forEach(key => {
+    for (const key of Object.keys(this.limiters)) {
       const limiter = this.limiters[key];
       status[key] = {
-        running: limiter.running(),
+        running: await limiter.running(),
         queued: limiter.queued(),
         reservoir: limiter.reservoir,
         capacity: limiter.capacity
       };
-    });
+    }
     return status;
   }
 

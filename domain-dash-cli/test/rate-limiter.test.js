@@ -19,8 +19,8 @@ describe('RateLimiter', () => {
     expect(rateLimiter.limiters.dns).toBeDefined();
   });
 
-  test('should provide status information', () => {
-    const status = rateLimiter.getStatus();
+  test('should provide status information', async () => {
+    const status = await rateLimiter.getStatus();
     expect(status).toBeDefined();
     expect(status.rdap).toBeDefined();
     expect(status.whois).toBeDefined();

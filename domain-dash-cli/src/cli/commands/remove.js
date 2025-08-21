@@ -23,4 +23,4 @@ function removeCommand(program) {
     });
 }
 
-module.exports = { removeCommand, removeDomain };
+module.exports = { removeDomain };

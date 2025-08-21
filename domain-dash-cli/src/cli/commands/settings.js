@@ -49,4 +49,4 @@ function settingsCommand(program) {
     });
 }
 
-module.exports = { settingsCommand, manageSettings };
+module.exports = { manageSettings };

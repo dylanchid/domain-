@@ -59,4 +59,4 @@ function importCommand(program) {
     });
 }
 
-module.exports = { importCommand, importDomains };
+module.exports = { importDomains };

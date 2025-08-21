@@ -67,4 +67,4 @@ function checkCommand(program) {
     });
 }
 
-module.exports = { checkCommand, checkDomains };
+module.exports = { checkDomains };

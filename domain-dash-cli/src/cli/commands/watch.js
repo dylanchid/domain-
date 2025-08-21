@@ -128,4 +128,4 @@ function printLaunchdInstructions(repoRoot, binPath) {
   console.log('4) To unload: launchctl unload ' + plistDest);
 }
 
-module.exports = { watchCommand, watchDomains };
+module.exports = { watchDomains };

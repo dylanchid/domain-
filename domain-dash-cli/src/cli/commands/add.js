@@ -41,4 +41,4 @@ function addCommand(program) {
     });
 }
 
-module.exports = { addCommand, addDomain };
+module.exports = { addDomain };

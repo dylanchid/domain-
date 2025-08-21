@@ -30,4 +30,4 @@ function listCommand(program) {
     });
 }
 
-module.exports = { listCommand, listDomains };
+module.exports = { listDomains };

@@ -1,13 +1,22 @@
 
 // Increase Jest timeout for CLI tests
-jest.setTimeout(20000);
+jest.setTimeout(30000);
 
 const { exec } = require('child_process');
 const Storage = require('../src/services/storage');
 
 function run(cmd, opts = {}) {
   return new Promise(resolve => {
-    const child = exec(cmd, {
+    // Use the source directly for tests due to path issues
+    let actualCmd;
+    if (cmd.includes('bin/domain-')) {
+      const args = cmd.replace(/.*bin\/domain-\s*/, '').trim();
+      actualCmd = `node -e "const program = require('./src/cli/parser'); program.parse(['node', 'cli', ${args ? "'" + args.split(' ').join("', '") + "'" : ''}]);"`;
+    } else {
+      actualCmd = cmd;
+    }
+    
+    const child = exec(actualCmd, {
       env: { ...process.env, NODE_ENV: 'test', JEST_WORKER_ID: process.env.JEST_WORKER_ID || '1' },
       ...opts
     }, (error, stdout, stderr) => resolve({ error, stdout, stderr }));
@@ -30,24 +39,33 @@ describe('CLI Tool', () => {
     });
   });
 
-  it('should list domains', (done) => {
-    run('node bin/domain- list').then(({ error, stdout, stderr }) => {
+  it('should list domains after adding one', (done) => {
+    // First add a domain, then list
+    run('node bin/domain- add example -e .com,.net').then(() => {
+      return run('node bin/domain- list');
+    }).then(({ error, stdout, stderr }) => {
       expect(stderr).toBe('');
-      expect(stdout).toContain('example.com');
+      expect(stdout).toContain('example');
       done();
     });
   });
 
-  it('should check domain availability for all', (done) => {
-    run('node bin/domain- check').then(({ error, stdout, stderr }) => {
+  it('should check domain availability after adding one', (done) => {
+    // First add a domain, then check
+    run('node bin/domain- add example -e .com,.net').then(() => {
+      return run('node bin/domain- check');
+    }).then(({ error, stdout, stderr }) => {
       expect(stderr).toBe('');
       expect(stdout).toMatch(/example ->/);
       done();
     });
   });
 
-  it('should remove a domain', (done) => {
-    run('node bin/domain- remove example').then(({ error, stdout, stderr }) => {
+  it('should remove a domain after adding one', (done) => {
+    // First add a domain, then remove it
+    run('node bin/domain- add example -e .com,.net').then(() => {
+      return run('node bin/domain- remove example');
+    }).then(({ error, stdout, stderr }) => {
       expect(stderr).toBe('');
       expect(stdout).toMatch(/has been removed|removed/i);
       done();

@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+
+try {
+  const program = require('../src/cli/parser');
+  program.parse(process.argv);
+} catch (err) {
+  console.error(err?.message || err);
+  process.exit(1);
+}
