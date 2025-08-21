@@ -110,7 +110,7 @@ class Storage {
     return false;
   }
 
-  // Per-extension update and aggregate sync
+  // Per-extension update and aggregate sync with enhanced data
   updateDomainExtensionStatus(domainName, extension, status) {
     const domains = this.getDomains();
     const name = this.normalizeName(domainName);
@@ -120,11 +120,18 @@ class Storage {
     if (!domain.results) domain.results = {};
     const prev = domain.results[extension] || { available: null };
 
+    // Store enhanced status information
     domain.results[extension] = {
       available: status.available,
       lastChecked: new Date().toISOString(),
       error: status.error || null,
-      via: status.via || null
+      via: status.via || null,
+      timestamp: status.timestamp || new Date().toISOString(),
+      duration: status.duration || null,
+      details: status.details || null,
+      warning: status.warning || null,
+      degraded: status.degraded || false,
+      retryable: status.retryable || false
     };
 
     // Aggregate status for legacy consumers
@@ -141,15 +148,30 @@ class Storage {
       domain.status = 'taken';
     }
 
+    // Track status changes for history
     if (prev.available !== null && prev.available !== status.available) {
       this.addToHistory('status_change', {
         domain: name,
         extension,
         from: prev.available ? 'available' : 'taken',
-        to: status.available ? 'available' : 'taken'
+        to: status.available ? 'available' : 'taken',
+        via: status.via,
+        timestamp: status.timestamp
       });
     }
 
+    // Track errors for monitoring
+    if (status.error && !prev.error) {r
+      this.addToHistory('error_detected', {
+        domain: name,
+        extension,
+        error: status.error,
+        via: status.via,
+        timestamp: status.timestamp
+      });
+    }
+
+    this.saveDomains(domains);
     this.saveDomains(domains);
     return true;
   }

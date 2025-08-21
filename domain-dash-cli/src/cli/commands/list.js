@@ -21,4 +21,13 @@ async function listDomains() {
   });
 }
 
-module.exports = listDomains;
+function listCommand(program) {
+  program
+    .command('list')
+    .description('List all monitored domains and their status')
+    .action(async () => {
+      await listDomains();
+    });
+}
+
+module.exports = { listCommand, listDomains };

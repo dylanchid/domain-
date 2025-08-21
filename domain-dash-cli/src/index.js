@@ -1,5 +1,5 @@
 const { program } = require('commander');
-const { startTUI } = require('./tui/index');
+const startTUI = require('./tui/index');
 const { addCommand } = require('./cli/commands/add');
 const { removeCommand } = require('./cli/commands/remove');
 const { listCommand } = require('./cli/commands/list');
@@ -24,10 +24,10 @@ importCommand(program);
 exportCommand(program);
 settingsCommand(program);
 
-// Parse command-line arguments
-program.parse(process.argv);
-
-// Start the TUI if no command is provided
+// Check if we should start TUI (no arguments provided)
 if (!process.argv.slice(2).length) {
   startTUI();
+} else {
+  // Parse command-line arguments
+  program.parse(process.argv);
 }

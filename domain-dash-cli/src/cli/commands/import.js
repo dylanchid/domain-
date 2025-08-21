@@ -50,4 +50,13 @@ function parseCSV(content) {
   };
 }
 
-module.exports = importDomains;
+function importCommand(program) {
+  program
+    .command('import <file>')
+    .description('Import domains from JSON or CSV file')
+    .action(async (file) => {
+      await importDomains(file);
+    });
+}
+
+module.exports = { importCommand, importDomains };

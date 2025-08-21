@@ -8,11 +8,14 @@
   },
   "scripts": {
     "start": "node src/index.js",
-    "test": "jest"
+    "test": "jest",
+    "demo": "node demo/enhanced-features.js"
   },
   "dependencies": {
+    "abort-controller": "^3.0.0",
     "axios": "^1.11.0",
     "blessed": "^0.1.81",
+    "bottleneck": "^2.19.5",
     "chalk": "^4.1.0",
     "commander": "^10.0.0",
     "conf": "^9.0.0",
@@ -21,6 +24,7 @@
     "node-notifier": "^10.0.0",
     "ora": "^6.0.0",
     "p-limit": "^2.3.0",
+    "p-retry": "^4.6.2",
     "whois-json": "^2.0.4"
   },
   "devDependencies": {

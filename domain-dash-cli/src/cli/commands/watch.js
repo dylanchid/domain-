@@ -7,7 +7,7 @@ const Checker = require('../../services/checker');
 const Scheduler = require('../../services/scheduler');
 const Notifications = require('../../services/notifications');
 
-module.exports = async function watch(argv = {}) {
+async function watchDomains(argv = {}) {
   // Daemonize path: prefer pm2 if requested or available; otherwise suggest launchd on macOS
   if (argv.daemon) {
     const manager = typeof argv.daemon === 'string' ? argv.daemon : 'pm2';
@@ -49,27 +49,33 @@ module.exports = async function watch(argv = {}) {
       printLaunchdInstructions(repoRoot, binPath);
       return;
     }
-
-    console.error('Unsupported daemon manager. Use "pm2" or "launchd".');
-    return;
   }
 
+  // Foreground mode
   const storage = new Storage();
   const domains = storage.getDomains();
+  
   if (domains.length === 0) {
-    console.log('No domains to watch. Please add domains first.');
+    console.log('No domains to watch.');
     return;
   }
 
-  const checker = new Checker(storage, { concurrency: argv.concurrency || 4 });
+  const checker = new Checker(storage, { 
+    concurrency: argv.concurrency || 3,
+    enableGracefulDegradation: true
+  });
   const scheduler = new Scheduler(checker, storage);
-  const notifications = new Notifications(storage);
+  const notifications = new Notifications();
 
-  if (typeof argv.notifications === 'boolean') {
-    notifications.setEnabled(argv.notifications);
-  }
+  scheduler.on('available', (data) => {
+    console.log(`🎉 AVAILABLE: ${data.fqdn} (via ${data.via})`);
+    notifications.sendNotification('Domain Available', `${data.fqdn} is now available!`);
+  });
 
-  scheduler.on('available', info => notifications.available(info));
+  scheduler.on('cycleComplete', (data) => {
+    const timestamp = data.timestamp ? data.timestamp.toLocaleString() : new Date().toLocaleString();
+    console.log(`✅ Check completed at ${timestamp}`);
+  });
 
   const interval = argv.interval || storage.getSetting('checkInterval') || 5;
   console.log(`Watching ${domains.length} domains every ${interval} minutes...`);
@@ -77,10 +83,28 @@ module.exports = async function watch(argv = {}) {
 
   // Keep process alive until SIGINT
   process.on('SIGINT', () => {
+    console.log('\nStopping domain watcher...');
     scheduler.stop();
+    checker.destroy();
     process.exit(0);
   });
-};
+}
+
+function watchCommand(program) {
+  program
+    .command('watch')
+    .description('Watch domains for availability changes')
+    .option('-i, --interval <minutes>', 'Check interval in minutes', '5')
+    .option('-c, --concurrency <number>', 'Number of concurrent checks', '3')
+    .option('-d, --daemon [manager]', 'Run as daemon (pm2, launchd, or auto)')
+    .action(async (options) => {
+      await watchDomains({
+        interval: parseInt(options.interval),
+        concurrency: parseInt(options.concurrency),
+        daemon: options.daemon
+      });
+    });
+}
 
 function printLaunchdInstructions(repoRoot, binPath) {
   const label = 'com.domain-.cli';
@@ -103,3 +127,5 @@ function printLaunchdInstructions(repoRoot, binPath) {
   console.log(`3) Load it: launchctl load ${plistDest}`);
   console.log('4) To unload: launchctl unload ' + plistDest);
 }
+
+module.exports = { watchCommand, watchDomains };

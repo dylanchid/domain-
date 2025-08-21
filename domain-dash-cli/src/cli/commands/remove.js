@@ -14,4 +14,13 @@ async function removeDomain(domainName) {
   }
 }
 
-module.exports = removeDomain;
+function removeCommand(program) {
+  program
+    .command('remove <domain>')
+    .description('Remove a domain from monitoring')
+    .action(async (domain) => {
+      await removeDomain(domain);
+    });
+}
+
+module.exports = { removeCommand, removeDomain };

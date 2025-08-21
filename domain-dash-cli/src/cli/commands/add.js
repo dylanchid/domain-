@@ -28,4 +28,17 @@ async function addDomain(input) {
   }
 }
 
-module.exports = addDomain;
+function addCommand(program) {
+  program
+    .command('add <domain>')
+    .description('Add a domain to monitor')
+    .option('-e, --extensions <extensions>', 'Comma-separated list of extensions (e.g., .com,.org,.net)', '.com')
+    .action(async (domain, options) => {
+      const extensions = options.extensions.split(',').map(ext => 
+        ext.trim().startsWith('.') ? ext.trim() : '.' + ext.trim()
+      );
+      await addDomain({ name: domain, extensions });
+    });
+}
+
+module.exports = { addCommand, addDomain };
